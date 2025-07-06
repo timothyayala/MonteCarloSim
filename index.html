@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Stock Simulator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        .input-section, .results-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        label {
+            font-weight: 600;
+            color: #334155; /* Slate 700 */
+        }
+        input[type="number"] {
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e1; /* Slate 300 */
+            border-radius: 0.5rem; /* Rounded corners */
+            font-size: 1rem;
+            color: #334155;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            width: 100%;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #6366f1; /* Indigo 500 */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); /* Focus ring */
+        }
+        button {
+            background-color: #6366f1; /* Indigo 500 */
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem; /* More rounded */
+            font-size: 1.125rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+            width: 100%;
+        }
+        button:hover {
+            background-color: #4f46e5; /* Indigo 600 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(99, 102, 241, 0.2);
+        }
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        .result-item {
+            background-color: #f8fafc; /* Lightest blue-gray */
+            border: 1px solid #e2e8f0; /* Slate 200 */
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        .result-item strong {
+            color: #1e293b; /* Slate 900 */
+            font-size: 1.1rem;
+        }
+        .result-item span {
+            color: #475569; /* Slate 600 */
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none; /* Hidden by default */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #ef4444; /* Red 500 */
+            background-color: #fef2f2; /* Red 50 */
+            border: 1px solid #fecaca; /* Red 200 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: none; /* Hidden by default */
+        }
+
+        /* Responsive adjustments */
+        @media (min-width: 768px) {
+            .input-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.5rem;
+            }
+            button {
+                width: auto; /* Allow button to size based on content on larger screens */
+                align-self: flex-end; /* Align button to the right */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center text-gray-800 mb-6">
+            Monte Carlo Stock Performance Simulator
+        </h1>
+
+        <div class="input-section">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">Simulation Parameters</h2>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label for="initialPrice">Initial Stock Price ($)</label>
+                    <input type="number" id="initialPrice" value="100" min="1" step="0.01">
+                </div>
+                <div class="input-group">
+                    <label for="drift">Expected Annual Return (Drift, e.g., 0.08 for 8%)</label>
+                    <input type="number" id="drift" value="0.08" step="0.001">
+                </div>
+                <div class="input-group">
+                    <label for="volatility">Annual Volatility (e.g., 0.20 for 20%)</label>
+                    <input type="number" id="volatility" value="0.20" step="0.001">
+                </div>
+                <div class="input-group">
+                    <label for="timeHorizon">Time Horizon (Years)</label>
+                    <input type="number" id="timeHorizon" value="5" min="1" step="1">
+                </div>
+                <div class="input-group">
+                    <label for="numSimulations">Number of Simulations</label>
+                    <input type="number" id="numSimulations" value="1000" min="100" step="100">
+                </div>
+                <div class="input-group">
+                    <label for="confidenceLevel">Confidence Level for VaR/CVaR (e.g., 0.95 for 95%)</label>
+                    <input type="number" id="confidenceLevel" value="0.95" min="0.01" max="0.999" step="0.01">
+                </div>
+            </div>
+            <button id="runSimulationBtn">Run Simulation</button>
+            <div id="errorMessage" class="error-message"></div>
+        </div>
+
+        <div class="loading-spinner" id="loadingSpinner"></div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">Simulation Results</h2>
+            <div class="results-grid" id="resultsGrid">
+                <!-- Results will be injected here by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to format numbers as currency
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+        }
+
+        // Function to format numbers as percentage
+        function formatPercentage(value) {
+            return new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+        }
+
+        // Function to display an error message
+        function showErrorMessage(message) {
+            const errorMessageDiv = document.getElementById('errorMessage');
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.style.display = 'block';
+        }
+
+        // Function to hide the error message
+        function hideErrorMessage() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // Function to simulate the backend API call and generate mock results
+        async function simulateBackendCall(params) {
+            // In a real application, this would be a fetch call to your Python backend:
+            // const response = await fetch('/api/run_simulation', {
+            //     method: 'POST',
+            //     headers: { 'Content-Cype': 'application/json' },
+            //     body: JSON.stringify(params)
+            // });
+            // const data = await response.json();
+            // return data;
+
+            // For this example, we'll simulate a delay and generate mock data
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    // Mock data based on typical Monte Carlo output
+                    const mockResults = {
+                        mean_final_price: params.initialPrice * (1 + params.drift * params.timeHorizon) * (1 + (Math.random() - 0.5) * 0.1),
+                        median_final_price: params.initialPrice * (1 + params.drift * params.timeHorizon) * (1 + (Math.random() - 0.5) * 0.05),
+                        std_dev_final_price: params.initialPrice * params.volatility * Math.sqrt(params.timeHorizon) * (0.8 + Math.random() * 0.4),
+                        [`VaR_${parseInt(params.confidenceLevel*100)}%_price`]: params.initialPrice * (1 - (1 - params.confidenceLevel) * 0.5 - Math.random() * 0.1),
+                        [`VaR_${parseInt(params.confidenceLevel*100)}%_loss`]: params.initialPrice * (1 - params.confidenceLevel) * 0.5 + Math.random() * 0.1 * params.initialPrice,
+                        [`CVaR_${parseInt(params.confidenceLevel*100)}%_price`]: params.initialPrice * (1 - (1 - params.confidenceLevel) * 0.7 - Math.random() * 0.15),
+                        [`CVaR_${parseInt(params.confidenceLevel*100)}%_loss`]: params.initialPrice * (1 - params.confidenceLevel) * 0.7 + Math.random() * 0.15 * params.initialPrice,
+                        probability_of_gain: 0.5 + (Math.random() - 0.5) * 0.2,
+                        probability_of_loss: 0.5 - (Math.random() - 0.5) * 0.2,
+                        min_final_price: params.initialPrice * (1 - params.volatility * params.timeHorizon * 0.5 - Math.random() * 0.2),
+                        max_final_price: params.initialPrice * (1 + params.volatility * params.timeHorizon * 0.5 + Math.random() * 0.2)
+                    };
+                    resolve(mockResults);
+                }, 1500); // Simulate 1.5 seconds network delay
+            });
+        }
+
+        document.getElementById('runSimulationBtn').addEventListener('click', async () => {
+            hideErrorMessage(); // Clear previous errors
+
+            const initialPrice = parseFloat(document.getElementById('initialPrice').value);
+            const drift = parseFloat(document.getElementById('drift').value);
+            const volatility = parseFloat(document.getElementById('volatility').value);
+            const timeHorizon = parseInt(document.getElementById('timeHorizon').value);
+            const numSimulations = parseInt(document.getElementById('numSimulations').value);
+            const confidenceLevel = parseFloat(document.getElementById('confidenceLevel').value);
+
+            // Basic input validation
+            if (isNaN(initialPrice) || initialPrice <= 0) {
+                showErrorMessage('Please enter a valid initial price (> 0).');
+                return;
+            }
+            if (isNaN(drift)) {
+                showErrorMessage('Please enter a valid drift.');
+                return;
+            }
+            if (isNaN(volatility) || volatility <= 0) {
+                showErrorMessage('Please enter a valid volatility (> 0).');
+                return;
+            }
+            if (isNaN(timeHorizon) || timeHorizon <= 0) {
+                showErrorMessage('Please enter a valid time horizon (> 0).');
+                return;
+            }
+            if (isNaN(numSimulations) || numSimulations < 100) {
+                showErrorMessage('Please enter at least 100 simulations.');
+                return;
+            }
+            if (isNaN(confidenceLevel) || confidenceLevel <= 0 || confidenceLevel >= 1) {
+                showErrorMessage('Please enter a confidence level between 0 and 1 (exclusive).');
+                return;
+            }
+
+
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsGrid = document.getElementById('resultsGrid');
+
+            loadingSpinner.style.display = 'block'; // Show spinner
+            resultsSection.style.display = 'none'; // Hide results
+            resultsGrid.innerHTML = ''; // Clear previous results
+
+            try {
+                // In a real scenario, this would send data to your Python backend
+                // and receive the actual simulation results.
+                const simulationParams = {
+                    initialPrice,
+                    drift,
+                    volatility,
+                    timeHorizon,
+                    numSimulations,
+                    confidenceLevel
+                };
+                const results = await simulateBackendCall(simulationParams); // Simulating API call
+
+                // Display results
+                for (const key in results) {
+                    if (results.hasOwnProperty(key)) {
+                        const value = results[key];
+                        let formattedValue;
+                        let title = key.replace(/_/g, ' ').replace('var', 'VaR').replace('cvar', 'CVaR').replace('prob', 'Probability of').trim();
+
+                        if (key.includes('price') || key.includes('loss')) {
+                            formattedValue = formatCurrency(value);
+                        } else if (key.includes('prob')) {
+                            formattedValue = formatPercentage(value);
+                        } else {
+                            formattedValue = value.toFixed(2); // Default for other numbers
+                        }
+
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'result-item';
+                        resultItem.innerHTML = `<strong>${title}</strong><span>${formattedValue}</span>`;
+                        resultsGrid.appendChild(resultItem);
+                    }
+                }
+                resultsSection.style.display = 'block'; // Show results
+            } catch (error) {
+                console.error('Error running simulation:', error);
+                showErrorMessage('An error occurred during simulation. Please try again. (Check console for details)');
+            } finally {
+                loadingSpinner.style.display = 'none'; // Hide spinner
+            }
+        });
+    </script>
+</body>
+</html>
